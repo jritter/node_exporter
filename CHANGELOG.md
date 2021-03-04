@@ -7,6 +7,7 @@
 
 * [BUGFIX] Handle errors from disabled PSI subsystem #1983
 * [BUGFIX] Sanitize strings from /sys/class/power_supply #1984
+* [BUGFIX] Don't expose network speed if it is unknown #1989
 
 ## 1.1.1 / 2021-02-12
 

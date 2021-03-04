@@ -143,7 +143,8 @@ func (c *netClassCollector) Update(ch chan<- prometheus.Metric) error {
 			pushMetric(ch, c.subsystem, "net_dev_group", *ifaceInfo.NetDevGroup, ifaceInfo.Name, prometheus.GaugeValue)
 		}
 
-		if ifaceInfo.Speed != nil {
+		// Some devices return -1 if the speed is unknown. Don't expose speed in this case.
+		if ifaceInfo.Speed != nil && *ifaceInfo.Speed >= 0 {
 			speedBytes := int64(*ifaceInfo.Speed * 1000 * 1000 / 8)
 			pushMetric(ch, c.subsystem, "speed_bytes", speedBytes, ifaceInfo.Name, prometheus.GaugeValue)
 		}

@@ -107,7 +107,7 @@ fi
   --collector.textfile.directory="collector/fixtures/textfile/two_metric_files/" \
   --collector.wifi.fixtures="collector/fixtures/wifi" \
   --collector.qdisc.fixtures="collector/fixtures/qdisc/" \
-  --collector.netclass.ignored-devices="(bond0|dmz|int)" \
+  --collector.netclass.ignored-devices="(dmz|int)" \
   --collector.bcache.priorityStats \
   --collector.cpu.info \
   --collector.cpu.info.flags-include="^(aes|avx.?|constant_tsc)$" \
