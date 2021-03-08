@@ -59,17 +59,17 @@ func NewDrmCollector(logger log.Logger) (Collector, error) {
 		portDpms: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "dpms"),
 			"Display Power Management Signaling state of Port. Off = 0, On = 1",
-			[]string{"port"}, nil,
+			[]string{"card", "port"}, nil,
 		),
 		portEnabled: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "enabled"),
 			"Indicates on whether the port is enabled (1) or disabled (0)",
-			[]string{"port"}, nil,
+			[]string{"card", "port"}, nil,
 		),
 		portStatus: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "status"),
 			"Indicates on whether the port is connected to a devices or not. connected = 1, disconnected = 0",
-			[]string{"port"}, nil,
+			[]string{"card", "port"}, nil,
 		),
 		logger: logger,
 	}, nil
@@ -110,6 +110,7 @@ func (c *drmCollector) Update(ch chan<- prometheus.Metric) error {
 			c.portDpms,
 			prometheus.GaugeValue,
 			float64(stats.Dpms),
+			stats.Card,
 			stats.Name,
 		)
 
@@ -117,6 +118,7 @@ func (c *drmCollector) Update(ch chan<- prometheus.Metric) error {
 			c.portEnabled,
 			prometheus.GaugeValue,
 			float64(stats.Enabled),
+			stats.Card,
 			stats.Name,
 		)
 
@@ -124,6 +126,7 @@ func (c *drmCollector) Update(ch chan<- prometheus.Metric) error {
 			c.portStatus,
 			prometheus.GaugeValue,
 			float64(stats.Status),
+			stats.Card,
 			stats.Name,
 		)
 	}
