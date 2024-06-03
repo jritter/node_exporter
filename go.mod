@@ -1,5 +1,7 @@
 module github.com/prometheus/node_exporter
 
+replace github.com/prometheus/procfs => ../procfs
+
 require (
 	github.com/beevik/ntp v0.3.0
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
@@ -26,4 +28,3 @@ require (
 
 go 1.14
 
-replace github.com/prometheus/procfs => ../procfs
