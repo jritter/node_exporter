@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !nonetdev
 // +build !nonetdev
 
 package collector
@@ -26,7 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func getNetDevStats(filter *netDevFilter, logger log.Logger) (netDevStats, error) {
+func getNetDevStats(filter *deviceFilter, logger log.Logger) (netDevStats, error) {
 	netDev := netDevStats{}
 
 	ifs, err := net.Interfaces()
@@ -49,12 +50,15 @@ func getNetDevStats(filter *netDevFilter, logger log.Logger) (netDevStats, error
 		netDev[iface.Name] = map[string]uint64{
 			"receive_packets":    ifaceData.Data.Ipackets,
 			"transmit_packets":   ifaceData.Data.Opackets,
-			"receive_errs":       ifaceData.Data.Ierrors,
-			"transmit_errs":      ifaceData.Data.Oerrors,
 			"receive_bytes":      ifaceData.Data.Ibytes,
 			"transmit_bytes":     ifaceData.Data.Obytes,
+			"receive_errors":     ifaceData.Data.Ierrors,
+			"transmit_errors":    ifaceData.Data.Oerrors,
+			"receive_dropped":    ifaceData.Data.Iqdrops,
 			"receive_multicast":  ifaceData.Data.Imcasts,
 			"transmit_multicast": ifaceData.Data.Omcasts,
+			"collisions":         ifaceData.Data.Collisions,
+			"noproto":            ifaceData.Data.Noproto,
 		}
 	}
 
@@ -86,6 +90,7 @@ type ifMsghdr2 struct {
 	Data      ifData64
 }
 
+// https://github.com/apple/darwin-xnu/blob/main/bsd/net/if_var.h#L199-L231
 type ifData64 struct {
 	Type       uint8
 	Typelen    uint8

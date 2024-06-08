@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !nopressure
 // +build !nopressure
 
 package collector
@@ -100,6 +101,14 @@ func (c *pressureStatsCollector) Update(ch chan<- prometheus.Metric) error {
 				return ErrNoData
 			}
 			return fmt.Errorf("failed to retrieve pressure stats: %w", err)
+		}
+		if vals.Some == nil {
+			level.Debug(c.logger).Log("msg", "pressure information returned no 'some' data")
+			return ErrNoData
+		}
+		if vals.Full == nil {
+			level.Debug(c.logger).Log("msg", "pressure information returned no 'full' data")
+			return ErrNoData
 		}
 		switch res {
 		case "cpu":

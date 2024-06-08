@@ -11,6 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !nozfs
+// +build !nozfs
+
 package collector
 
 import (
@@ -388,7 +391,7 @@ func TestAbdstatsParsing(t *testing.T) {
 }
 
 func TestDbufstatsParsing(t *testing.T) {
-	dbufstatsFile, err := os.Open("fixtures/proc/spl/kstat/zfs/dbuf_stats")
+	dbufstatsFile, err := os.Open("fixtures/proc/spl/kstat/zfs/dbufstats")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,6 +535,15 @@ func TestPoolStateParsing(t *testing.T) {
 					t.Fatalf("Incorrect parsed value for degraded state")
 				}
 			}
+			if poolName == "pool2" {
+				if isActive != uint64(1) && stateName == "suspended" {
+					t.Fatalf("Incorrect parsed value for suspended state")
+				}
+				if isActive != uint64(0) && stateName != "suspended" {
+					t.Fatalf("Incorrect parsed value for suspended state")
+				}
+			}
+
 		})
 		file.Close()
 		if err != nil {

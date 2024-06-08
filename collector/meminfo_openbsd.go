@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build openbsd,!amd64
-// +build !nomeminfo
+//go:build !nomeminfo && !amd64
+// +build !nomeminfo,!amd64
 
 package collector
 

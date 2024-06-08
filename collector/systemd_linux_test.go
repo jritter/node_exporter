@@ -11,14 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !nosystemd
+// +build !nosystemd
+
 package collector
 
 import (
-	"github.com/go-kit/log"
 	"regexp"
 	"testing"
 
-	"github.com/coreos/go-systemd/dbus"
+	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/go-kit/log"
 )
 
 // Creates mock UnitLists
@@ -106,7 +109,7 @@ func TestSystemdIgnoreFilterDefaultKeepsAll(t *testing.T) {
 	}
 	fixtures := getUnitListFixtures()
 	collector := c.(*systemdCollector)
-	filtered := filterUnits(fixtures[0], collector.unitIncludePattern, collector.unitExcludePattern, logger)
+	filtered := filterUnits(fixtures[0], collector.systemdUnitIncludePattern, collector.systemdUnitExcludePattern, logger)
 	// Adjust fixtures by 3 "not-found" units.
 	if len(filtered) != len(fixtures[0])-3 {
 		t.Error("Default filters removed units")

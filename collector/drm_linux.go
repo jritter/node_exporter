@@ -1,4 +1,4 @@
-// Copyright 2019 The Prometheus Authors
+// Copyright 2021 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -11,7 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !nodrm
+//go:build !nogpu
+// +build !nogpu
 
 package collector
 
@@ -23,21 +24,32 @@ import (
 	"github.com/prometheus/procfs/sysfs"
 )
 
+const (
+	drmCollectorSubsystem = "drm"
+)
+
 type drmCollector struct {
-	fs          sysfs.FS
-	cardEnable  *prometheus.Desc
-	cardInfo    *prometheus.Desc
-	portDpms    *prometheus.Desc
-	portEnabled *prometheus.Desc
-	portStatus  *prometheus.Desc
-	logger      log.Logger
+	fs                    sysfs.FS
+	logger                log.Logger
+	CardEnable            *prometheus.Desc
+	CardInfo              *prometheus.Desc
+	PortDpms              *prometheus.Desc
+	PortEnabled           *prometheus.Desc
+	PortStatus            *prometheus.Desc
+	GPUBusyPercent        *prometheus.Desc
+	MemoryGTTSize         *prometheus.Desc
+	MemoryGTTUsed         *prometheus.Desc
+	MemoryVisibleVRAMSize *prometheus.Desc
+	MemoryVisibleVRAMUsed *prometheus.Desc
+	MemoryVRAMSize        *prometheus.Desc
+	MemoryVRAMUsed        *prometheus.Desc
 }
 
 func init() {
-	registerCollector("drm", defaultEnabled, NewDrmCollector)
+	registerCollector("drm", defaultDisabled, NewDrmCollector)
 }
 
-// NewThermalZoneCollector returns a new Collector exposing kernel/system statistics.
+// NewDrmCollector returns a new Collector exposing /sys/class/drm/card?/device stats.
 func NewDrmCollector(logger log.Logger) (Collector, error) {
 	fs, err := sysfs.NewFS(*sysPath)
 	if err != nil {
@@ -45,90 +57,107 @@ func NewDrmCollector(logger log.Logger) (Collector, error) {
 	}
 
 	return &drmCollector{
-		fs: fs,
-		cardEnable: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "drm_card", "enable"),
+		fs:     fs,
+		logger: logger,
+		CardEnable: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "enable"),
 			"Indicates on whether the card is enabled (1) or disabled (0)",
 			[]string{"card"}, nil,
 		),
-		cardInfo: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "drm_card", "info"),
-			"Information regarding the card",
-			[]string{"card", "driver"}, nil,
+		CardInfo: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "card_info"),
+			"Card information",
+			[]string{"card", "memory_vendor", "power_performance_level", "unique_id", "vendor"}, nil,
 		),
-		portDpms: prometheus.NewDesc(
+		GPUBusyPercent: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "gpu_busy_percent"),
+			"How busy the GPU is as a percentage.",
+			[]string{"card"}, nil,
+		),
+		MemoryGTTSize: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "memory_gtt_size_bytes"),
+			"The size of the graphics translation table (GTT) block in bytes.",
+			[]string{"card"}, nil,
+		),
+		MemoryGTTUsed: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "memory_gtt_used_bytes"),
+			"The used amount of the graphics translation table (GTT) block in bytes.",
+			[]string{"card"}, nil,
+		),
+		MemoryVisibleVRAMSize: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "memory_vis_vram_size_bytes"),
+			"The size of visible VRAM in bytes.",
+			[]string{"card"}, nil,
+		),
+		MemoryVisibleVRAMUsed: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "memory_vis_vram_used_bytes"),
+			"The used amount of visible VRAM in bytes.",
+			[]string{"card"}, nil,
+		),
+		MemoryVRAMSize: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "memory_vram_size_bytes"),
+			"The size of VRAM in bytes.",
+			[]string{"card"}, nil,
+		),
+		MemoryVRAMUsed: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "memory_vram_used_bytes"),
+			"The used amount of VRAM in bytes.",
+			[]string{"card"}, nil,
+		),
+		PortDpms: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "dpms"),
 			"Display Power Management Signaling state of Port. Off = 0, On = 1",
 			[]string{"card", "port"}, nil,
 		),
-		portEnabled: prometheus.NewDesc(
+		PortEnabled: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "enabled"),
 			"Indicates on whether the port is enabled (1) or disabled (0)",
 			[]string{"card", "port"}, nil,
 		),
-		portStatus: prometheus.NewDesc(
+		PortStatus: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "status"),
 			"Indicates on whether the port is connected to a devices or not. connected = 1, disconnected = 0",
 			[]string{"card", "port"}, nil,
 		),
-		logger: logger,
 	}, nil
 }
 
 func (c *drmCollector) Update(ch chan<- prometheus.Metric) error {
+	return c.updateAMDCards(ch)
+}
 
-	drmCards, err := c.fs.ClassDrmCard()
+func (c *drmCollector) updateAMDCards(ch chan<- prometheus.Metric) error {
+	vendor := "amd"
+	stats, err := c.fs.ClassDRMCardAMDGPUStats()
 	if err != nil {
 		return err
 	}
 
-	for _, stats := range drmCards {
+	for _, s := range stats {
 		ch <- prometheus.MustNewConstMetric(
-			c.cardEnable,
-			prometheus.GaugeValue,
-			float64(stats.Enable),
-			stats.Name,
-		)
+			c.CardInfo, prometheus.GaugeValue, 1,
+			s.Name, s.MemoryVRAMVendor, s.PowerDPMForcePerformanceLevel, s.UniqueID, vendor)
 
 		ch <- prometheus.MustNewConstMetric(
-			c.cardInfo,
-			prometheus.GaugeValue,
-			1,
-			stats.Name,
-			stats.Driver,
-		)
-
-	}
-
-	drmCardPorts, err := c.fs.ClassDrmCardPort()
-	if err != nil {
-		return err
-	}
-
-	for _, stats := range drmCardPorts {
-		ch <- prometheus.MustNewConstMetric(
-			c.portDpms,
-			prometheus.GaugeValue,
-			float64(stats.Dpms),
-			stats.Card,
-			stats.Name,
-		)
+			c.GPUBusyPercent, prometheus.GaugeValue, float64(s.GPUBusyPercent), s.Name)
 
 		ch <- prometheus.MustNewConstMetric(
-			c.portEnabled,
-			prometheus.GaugeValue,
-			float64(stats.Enabled),
-			stats.Card,
-			stats.Name,
-		)
+			c.MemoryGTTSize, prometheus.GaugeValue, float64(s.MemoryGTTSize), s.Name)
 
 		ch <- prometheus.MustNewConstMetric(
-			c.portStatus,
-			prometheus.GaugeValue,
-			float64(stats.Status),
-			stats.Card,
-			stats.Name,
-		)
+			c.MemoryGTTUsed, prometheus.GaugeValue, float64(s.MemoryGTTUsed), s.Name)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.MemoryVRAMSize, prometheus.GaugeValue, float64(s.MemoryVRAMSize), s.Name)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.MemoryVRAMUsed, prometheus.GaugeValue, float64(s.MemoryVRAMUsed), s.Name)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.MemoryVisibleVRAMSize, prometheus.GaugeValue, float64(s.MemoryVisibleVRAMSize), s.Name)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.MemoryVisibleVRAMUsed, prometheus.GaugeValue, float64(s.MemoryVisibleVRAMUsed), s.Name)
 	}
 
 	return nil
