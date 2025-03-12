@@ -106,12 +106,12 @@ func NewDrmCollector(logger log.Logger) (Collector, error) {
 		),
 		PortDpms: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "dpms"),
-			"Display Power Management Signaling state of Port. Off = 0, On = 1",
+			"Display Power Management Signaling state of port. Off = 0, On = 1",
 			[]string{"card", "port"}, nil,
 		),
 		PortEnabled: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "drm_card_port", "enabled"),
-			"Indicates on whether the port is enabled (1) or disabled (0)",
+			"Indicates on whether the port is enabled or disabled. enabled = 1, disabled = 0",
 			[]string{"card", "port"}, nil,
 		),
 		PortStatus: prometheus.NewDesc(
@@ -123,7 +123,51 @@ func NewDrmCollector(logger log.Logger) (Collector, error) {
 }
 
 func (c *drmCollector) Update(ch chan<- prometheus.Metric) error {
-	return c.updateAMDCards(ch)
+
+	err := c.updateDRMCards(ch)
+	if err != nil {
+		return err
+	}
+	err = c.updateAMDCards(ch)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *drmCollector) updateDRMCards(ch chan<- prometheus.Metric) error {
+
+	stats, err := c.fs.DRMCardClass()
+	if err != nil {
+		return err
+	}
+
+	for _, s := range stats {
+		for _, port := range s.Ports {
+			portConnected := 0
+			if port.Status == "connected" {
+				portConnected = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.PortStatus, prometheus.GaugeValue, float64(portConnected), s.Name, port.Name)
+
+			portEnabled := 0
+			if port.Enabled == "enabled" {
+				portEnabled = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.PortEnabled, prometheus.GaugeValue, float64(portEnabled), s.Name, port.Name)
+
+			portDPMS := 0
+			if port.DPMS == "On" {
+				portDPMS = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.PortDpms, prometheus.GaugeValue, float64(portDPMS), s.Name, port.Name)
+		}
+
+	}
+	return nil
 }
 
 func (c *drmCollector) updateAMDCards(ch chan<- prometheus.Metric) error {
