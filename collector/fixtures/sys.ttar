@@ -1798,26 +1798,6 @@ SymlinkTo: ../../devices/platform/nct6775.656/hwmon/hwmon3
 Directory: sys/class/hwmon/hwmon4
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: sys/class/hwmon/hwmon4/freq1_input
-Lines: 1
-214000000
-Mode: 644
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: sys/class/hwmon/hwmon4/freq1_label
-Lines: 1
-sclk
-Mode: 644
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: sys/class/hwmon/hwmon4/freq2_input
-Lines: 1
-300000000
-Mode: 644
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: sys/class/hwmon/hwmon4/freq2_label
-Lines: 1
-mclk
-Mode: 644
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: sys/class/hwmon/hwmon4/temp1_crit
 Lines: 1
 100000
