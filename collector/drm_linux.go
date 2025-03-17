@@ -167,7 +167,7 @@ func (c *drmCollector) updateDRMCards(ch chan<- prometheus.Metric) error {
 				portDPMS = 1
 			}
 			ch <- prometheus.MustNewConstMetric(
-				c.PortDpms, prometheus.GaugeValue, float64(portDPMS), s.Name, port.Name)
+				c.PortDpms, prometheus.GaugeValue, float64(portDPMS), s.Name, trimmedPortName)
 		}
 
 	}
