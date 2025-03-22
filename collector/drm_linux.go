@@ -19,6 +19,7 @@ package collector
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/procfs/sysfs"
@@ -31,7 +32,11 @@ const (
 type drmCollector struct {
 	fs                    sysfs.FS
 	logger                *slog.Logger
+	CardEnable            *prometheus.Desc
 	CardInfo              *prometheus.Desc
+	PortDpms              *prometheus.Desc
+	PortEnabled           *prometheus.Desc
+	PortStatus            *prometheus.Desc
 	GPUBusyPercent        *prometheus.Desc
 	MemoryGTTSize         *prometheus.Desc
 	MemoryGTTUsed         *prometheus.Desc
@@ -55,10 +60,15 @@ func NewDrmCollector(logger *slog.Logger) (Collector, error) {
 	return &drmCollector{
 		fs:     fs,
 		logger: logger,
+		CardEnable: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "enable"),
+			"Indicates on whether the card is enabled (1) or disabled (0)",
+			[]string{"card"}, nil,
+		),
 		CardInfo: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "card_info"),
 			"Card information",
-			[]string{"card", "memory_vendor", "power_performance_level", "unique_id", "vendor"}, nil,
+			[]string{"card", "driver", "memory_vendor", "power_performance_level", "unique_id", "vendor"}, nil,
 		),
 		GPUBusyPercent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, drmCollectorSubsystem, "gpu_busy_percent"),
@@ -95,11 +105,73 @@ func NewDrmCollector(logger *slog.Logger) (Collector, error) {
 			"The used amount of VRAM in bytes.",
 			[]string{"card"}, nil,
 		),
+		PortDpms: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "drm_card_port", "dpms"),
+			"Display Power Management Signaling state of port. Off = 0, On = 1",
+			[]string{"card", "port"}, nil,
+		),
+		PortEnabled: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "drm_card_port", "enabled"),
+			"Indicates on whether the port is enabled or disabled. enabled = 1, disabled = 0",
+			[]string{"card", "port"}, nil,
+		),
+		PortStatus: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "drm_card_port", "status"),
+			"Indicates on whether the port is connected to a devices or not. connected = 1, disconnected = 0",
+			[]string{"card", "port"}, nil,
+		),
 	}, nil
 }
 
 func (c *drmCollector) Update(ch chan<- prometheus.Metric) error {
-	return c.updateAMDCards(ch)
+
+	err := c.updateDRMCards(ch)
+	if err != nil {
+		return err
+	}
+	err = c.updateAMDCards(ch)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *drmCollector) updateDRMCards(ch chan<- prometheus.Metric) error {
+
+	stats, err := c.fs.DRMCardClass()
+	if err != nil {
+		return err
+	}
+
+	for _, s := range stats {
+		for _, port := range s.Ports {
+
+			trimmedPortName := strings.TrimPrefix(port.Name, s.Name+"-")
+
+			portConnected := 0
+			if port.Status == "connected" {
+				portConnected = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.PortStatus, prometheus.GaugeValue, float64(portConnected), s.Name, trimmedPortName)
+
+			portEnabled := 0
+			if port.Enabled == "enabled" {
+				portEnabled = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.PortEnabled, prometheus.GaugeValue, float64(portEnabled), s.Name, trimmedPortName)
+
+			portDPMS := 0
+			if port.DPMS == "On" {
+				portDPMS = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.PortDpms, prometheus.GaugeValue, float64(portDPMS), s.Name, trimmedPortName)
+		}
+
+	}
+	return nil
 }
 
 func (c *drmCollector) updateAMDCards(ch chan<- prometheus.Metric) error {
@@ -109,10 +181,15 @@ func (c *drmCollector) updateAMDCards(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
+	cardStats, err := c.fs.DRMCardClass()
+	if err != nil {
+		return err
+	}
+
 	for _, s := range stats {
 		ch <- prometheus.MustNewConstMetric(
 			c.CardInfo, prometheus.GaugeValue, 1,
-			s.Name, s.MemoryVRAMVendor, s.PowerDPMForcePerformanceLevel, s.UniqueID, vendor)
+			s.Name, cardStats[s.Name].Driver, s.MemoryVRAMVendor, s.PowerDPMForcePerformanceLevel, s.UniqueID, vendor)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.GPUBusyPercent, prometheus.GaugeValue, float64(s.GPUBusyPercent), s.Name)
