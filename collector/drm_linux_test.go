@@ -18,11 +18,11 @@ package collector
 
 import (
 	"fmt"
-	"os"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -39,7 +39,7 @@ func (c testDRMCollector) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(c, ch)
 }
 
-func NewTestDRMCollector(logger log.Logger) (prometheus.Collector, error) {
+func NewTestDRMCollector(logger *slog.Logger) (prometheus.Collector, error) {
 	dsc, err := NewDrmCollector(logger)
 	if err != nil {
 		return testDRMCollector{}, err
@@ -100,7 +100,7 @@ node_drm_memory_vram_used_bytes{card="card0"} 1.490378752e+09
 node_drm_memory_vram_used_bytes{card="card1"} 0
 `
 
-	logger := log.NewLogfmtLogger(os.Stderr)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	collector, err := NewDrmCollector(logger)
 	if err != nil {
 		t.Fatal(err)
